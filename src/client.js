@@ -1,7 +1,13 @@
-const WebSocket = require('ws');
-
 const misc = require('./miscRequests');
 const protocol = require('./protocol');
+const {
+  createWebSocket,
+  addWebSocketEventHandlers,
+  sendWebSocketData,
+  getWebSocketReadyState,
+  closeWebSocket,
+  getDebugFlag,
+} = require('./environment');
 
 const quoteSessionGenerator = require('./quote/session');
 const chartSessionGenerator = require('./chart/session');
@@ -47,7 +53,7 @@ module.exports = class Client {
 
   /** If the cient was closed */
   get isOpen() {
-    return this.#ws.readyState === this.#ws.OPEN;
+    return this.#ws.readyState === getWebSocketReadyState('OPEN');
   }
 
   /** @type {SessionList} */
@@ -158,16 +164,16 @@ module.exports = class Client {
     if (!this.isOpen) return;
 
     protocol.parseWSPacket(str).forEach((packet) => {
-      if (global.TW_DEBUG) console.log('§90§30§107 CLIENT §0 PACKET', packet);
+      if (getDebugFlag()) console.log('§90§30§107 CLIENT §0 PACKET', packet);
       if (typeof packet === 'number') { // Ping
-        this.#ws.send(protocol.formatWSPacket(`~h~${packet}`));
+        sendWebSocketData(this.#ws, protocol.formatWSPacket(`~h~${packet}`));
         this.#handleEvent('ping', packet);
         return;
       }
 
       if (packet.m === 'protocol_error') { // Error
         this.#handleError('Client critical error:', packet.p);
-        this.#ws.close();
+        closeWebSocket(this.#ws);
         return;
       }
 
@@ -206,8 +212,8 @@ module.exports = class Client {
   sendQueue() {
     while (this.isOpen && this.#logged && this.#sendQueue.length > 0) {
       const packet = this.#sendQueue.shift();
-      this.#ws.send(packet);
-      if (global.TW_DEBUG) console.log('§90§30§107 > §0', packet);
+      sendWebSocketData(this.#ws, packet);
+      if (getDebugFlag()) console.log('§90§30§107 > §0', packet);
     }
   }
 
@@ -215,6 +221,7 @@ module.exports = class Client {
    * @typedef {Object} ClientOptions
    * @prop {string} [token] User auth token (in 'sessionid' cookie)
    * @prop {string} [signature] User auth token signature (in 'sessionid_sign' cookie)
+   * @prop {string} [authToken] Direct auth token (bypasses getUser call)
    * @prop {boolean} [DEBUG] Enable debug mode
    * @prop {'data' | 'prodata' | 'widgetdata'} [server] Server type
    * @prop {string} [location] Auth page location (For france: https://fr.tradingview.com/)
@@ -225,14 +232,29 @@ module.exports = class Client {
    * @param {ClientOptions} clientOptions TradingView client options
    */
   constructor(clientOptions = {}) {
-    if (clientOptions.DEBUG) global.TW_DEBUG = clientOptions.DEBUG;
+    if (clientOptions.DEBUG) {
+      if (typeof window !== 'undefined') {
+        window.TW_DEBUG = clientOptions.DEBUG;
+      } else {
+        global.TW_DEBUG = clientOptions.DEBUG;
+      }
+    }
 
     const server = clientOptions.server || 'data';
-    this.#ws = new WebSocket(`wss://${server}.tradingview.com/socket.io/websocket?type=chart`, {
-      origin: 'https://www.tradingview.com',
-    });
+    this.#ws = createWebSocket(
+      `wss://${server}.tradingview.com/socket.io/websocket?type=chart`,
+      { origin: 'https://www.tradingview.com' }
+    );
 
-    if (clientOptions.token) {
+    if (clientOptions.authToken) {
+      // Direct auth token provided - bypass getUser
+      this.#sendQueue.unshift(protocol.formatWSPacket({
+        m: 'set_auth_token',
+        p: [clientOptions.authToken],
+      }));
+      this.#logged = true;
+      this.sendQueue();
+    } else if (clientOptions.token) {
       misc.getUser(
         clientOptions.token,
         clientOptions.signature ? clientOptions.signature : '',
@@ -256,21 +278,20 @@ module.exports = class Client {
       this.sendQueue();
     }
 
-    this.#ws.on('open', () => {
-      this.#handleEvent('connected');
-      this.sendQueue();
+    addWebSocketEventHandlers(this.#ws, {
+      open: () => {
+        this.#handleEvent('connected');
+        this.sendQueue();
+      },
+      close: () => {
+        this.#logged = false;
+        this.#handleEvent('disconnected');
+      },
+      error: (err) => {
+        this.#handleError('WebSocket error:', err.message || err.type || 'Unknown error');
+      },
+      message: (data) => this.#parsePacket(data),
     });
-
-    this.#ws.on('close', () => {
-      this.#logged = false;
-      this.#handleEvent('disconnected');
-    });
-
-    this.#ws.on('error', (err) => {
-      this.#handleError('WebSocket error:', err.message);
-    });
-
-    this.#ws.on('message', (data) => this.#parsePacket(data));
   }
 
   /** @type {ClientBridge} */
@@ -291,7 +312,7 @@ module.exports = class Client {
    */
   end() {
     return new Promise((cb) => {
-      if (this.#ws.readyState) this.#ws.close();
+      closeWebSocket(this.#ws);
       cb();
     });
   }

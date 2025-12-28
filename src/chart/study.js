@@ -1,6 +1,7 @@
 const { genSessionID } = require('../utils');
 const { parseCompressed } = require('../protocol');
 const graphicParser = require('./graphicParser');
+const { getDebugFlag } = require('../environment');
 
 const PineIndicator = require('../classes/PineIndicator');
 const BuiltInIndicator = require('../classes/BuiltInIndicator');
@@ -235,7 +236,7 @@ module.exports = (chartSession) => class ChartStudy {
     this.instance = indicator;
 
     this.#studyListeners[this.#studID] = async (packet) => {
-      if (global.TW_DEBUG) console.log('§90§30§105 STUDY §0 DATA', packet);
+      if (getDebugFlag()) console.log('§90§30§105 STUDY §0 DATA', packet);
 
       if (packet.type === 'study_completed') {
         this.#handleEvent('studyCompleted');

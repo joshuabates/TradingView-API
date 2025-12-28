@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TradingView API Browser Example</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+        }
+        .controls {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .controls input, .controls button {
+            padding: 8px 12px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .controls button {
+            background: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        .controls button:hover {
+            background: #0056b3;
+        }
+        .controls button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .output {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            height: 400px;
+            overflow-y: auto;
+        }
+        .log-entry {
+            padding: 5px;
+            margin: 2px 0;
+            border-left: 3px solid #007bff;
+            background: #f8f9fa;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+        .error {
+            border-left-color: #dc3545;
+            background: #fff5f5;
+            color: #dc3545;
+        }
+        .success {
+            border-left-color: #28a745;
+            background: #f5fff5;
+        }
+        .info {
+            border-left-color: #17a2b8;
+            background: #f5fdff;
+        }
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            background: #e9ecef;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>TradingView API Browser Example</h1>
+    
+    <div class="controls">
+        <h2>Real-time Market Data Demo</h2>
+        <div class="status">
+            <strong>Status:</strong> <span id="status">Not connected</span>
+        </div>
+        <input type="text" id="symbolInput" placeholder="Enter symbol (e.g., AAPL, BTCUSD)" value="AAPL">
+        <button id="connectBtn" onclick="connectAndSubscribe()">Connect & Subscribe</button>
+        <button id="disconnectBtn" onclick="disconnect()" disabled>Disconnect</button>
+        <button onclick="clearLogs()">Clear Logs</button>
+        <label>
+            <input type="checkbox" id="debugMode" onchange="toggleDebug()">
+            Debug Mode
+        </label>
+    </div>
+
+    <div class="output" id="output"></div>
+
+    <!-- Include the built TradingView API -->
+    <script src="../dist/tradingview-api.browser.js"></script>
+    
+    <script>
+        let client = null;
+        let quoteSession = null;
+        
+        // Check if TradingViewAPI loaded correctly
+        if (typeof TradingViewAPI === 'undefined') {
+            document.getElementById('output').innerHTML = '<div class="log-entry error">ERROR: TradingViewAPI not loaded. Make sure to run "npm run build" first!</div>';
+        } else {
+            log('TradingViewAPI loaded successfully', 'success');
+            log('Available exports: ' + Object.keys(TradingViewAPI).join(', '), 'info');
+        }
+        
+        function updateStatus(status) {
+            document.getElementById('status').textContent = status;
+        }
+        
+        function log(message, type = 'info') {
+            const output = document.getElementById('output');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            output.appendChild(entry);
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function toggleDebug() {
+            const debugMode = document.getElementById('debugMode').checked;
+            window.TW_DEBUG = debugMode;
+            log(`Debug mode ${debugMode ? 'enabled' : 'disabled'}`);
+        }
+
+        async function connectAndSubscribe() {
+            try {
+                const symbol = document.getElementById('symbolInput').value.trim();
+                if (!symbol) {
+                    log('Please enter a symbol', 'error');
+                    return;
+                }
+
+                // Disable connect button
+                document.getElementById('connectBtn').disabled = true;
+                updateStatus('Connecting...');
+
+                log('Creating TradingView client...', 'info');
+                
+                // Create client (no authentication for public data)
+                client = new TradingViewAPI.Client({
+                    DEBUG: document.getElementById('debugMode').checked
+                });
+
+                // Set up event handlers
+                client.onConnected(() => {
+                    log('Connected to TradingView WebSocket!', 'success');
+                    updateStatus('Connected');
+                    document.getElementById('disconnectBtn').disabled = false;
+                });
+
+                client.onDisconnected(() => {
+                    log('Disconnected from TradingView', 'error');
+                    updateStatus('Disconnected');
+                    document.getElementById('connectBtn').disabled = false;
+                    document.getElementById('disconnectBtn').disabled = true;
+                });
+
+                client.onError((...args) => {
+                    log(`Error: ${args.join(' ')}`, 'error');
+                });
+
+                client.onLogged((sessionInfo) => {
+                    log(`Logged in with session: ${JSON.stringify(sessionInfo)}`, 'success');
+                });
+
+                // Wait a bit for connection
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
+                // Create quote session
+                log(`Creating quote session...`, 'info');
+                quoteSession = new client.Session.Quote();
+
+                // Set up quote data handler
+                quoteSession.onData((data) => {
+                    log(`Quote data: ${JSON.stringify(data)}`, 'success');
+                });
+
+                quoteSession.onError((error) => {
+                    log(`Quote error: ${error}`, 'error');
+                });
+
+                // Subscribe to symbol
+                log(`Subscribing to ${symbol}...`, 'info');
+                await quoteSession.add(symbol);
+                log(`Subscribed to ${symbol}. Waiting for real-time data...`, 'success');
+
+            } catch (error) {
+                log(`Failed to connect: ${error.message}`, 'error');
+                console.error(error);
+                updateStatus('Error');
+                document.getElementById('connectBtn').disabled = false;
+                document.getElementById('disconnectBtn').disabled = true;
+            }
+        }
+
+        function disconnect() {
+            if (client) {
+                log('Closing connection...', 'info');
+                client.end();
+                client = null;
+                quoteSession = null;
+                updateStatus('Not connected');
+                document.getElementById('connectBtn').disabled = false;
+                document.getElementById('disconnectBtn').disabled = true;
+            }
+        }
+
+        function clearLogs() {
+            document.getElementById('output').innerHTML = '';
+            if (typeof TradingViewAPI !== 'undefined') {
+                log('Logs cleared', 'info');
+            }
+        }
+
+        // Test ES6 module version
+        if (window.location.search.includes('esm')) {
+            log('Testing ES6 module version...', 'info');
+            import('../browser.js').then(module => {
+                log('ES6 module loaded successfully', 'success');
+                log('Available named exports: ' + Object.keys(module).join(', '), 'info');
+                window.TradingViewAPI = module.default;
+            }).catch(err => {
+                log('Failed to load ES6 module: ' + err.message, 'error');
+            });
+        }
+    </script>
+</body>
+</html>

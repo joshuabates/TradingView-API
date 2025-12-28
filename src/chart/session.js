@@ -1,4 +1,5 @@
 const { genSessionID } = require('../utils');
+const { getDebugFlag } = require('../environment');
 
 const studyConstructor = require('./study');
 
@@ -184,7 +185,7 @@ module.exports = (client) => class ChartSession {
     this.#client.sessions[this.#chartSessionID] = {
       type: 'chart',
       onData: (packet) => {
-        if (global.TW_DEBUG) console.log('§90§30§106 CHART SESSION §0 DATA', packet);
+        if (getDebugFlag()) console.log('§90§30§106 CHART SESSION §0 DATA', packet);
 
         if (typeof packet.data[1] === 'string' && this.#studyListeners[packet.data[1]]) {
           this.#studyListeners[packet.data[1]](packet);
@@ -252,7 +253,7 @@ module.exports = (client) => class ChartSession {
     this.#client.sessions[this.#replaySessionID] = {
       type: 'replay',
       onData: (packet) => {
-        if (global.TW_DEBUG) console.log('§90§30§106 REPLAY SESSION §0 DATA', packet);
+        if (getDebugFlag()) console.log('§90§30§106 REPLAY SESSION §0 DATA', packet);
 
         if (packet.type === 'replay_ok') {
           if (this.#replayOKCB[packet.data[1]]) {

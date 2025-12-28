@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TradingView Advanced Charts with Datafeed</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background-color: #1e222d;
+            color: #d1d4dc;
+        }
+        .header {
+            background-color: #131722;
+            padding: 10px 20px;
+            border-bottom: 1px solid #2a2e39;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 20px;
+            color: #d1d4dc;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .controls input, .controls button {
+            padding: 8px 12px;
+            background-color: #2a2e39;
+            border: 1px solid #363a45;
+            color: #d1d4dc;
+            border-radius: 4px;
+        }
+        .controls button {
+            cursor: pointer;
+            background-color: #2962ff;
+            border-color: #2962ff;
+        }
+        .controls button:hover {
+            background-color: #1e53e5;
+        }
+        #tv_chart_container {
+            height: calc(100vh - 60px);
+            width: 100%;
+        }
+        .status {
+            margin-left: auto;
+            font-size: 14px;
+        }
+        .status.connected {
+            color: #26a69a;
+        }
+        .status.disconnected {
+            color: #ef5350;
+        }
+        .error-message {
+            position: fixed;
+            top: 70px;
+            right: 20px;
+            background-color: #ef5350;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 4px;
+            display: none;
+            max-width: 400px;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>TradingView Advanced Charts - Datafeed Example</h1>
+        <div class="controls">
+            <input type="text" id="symbolInput" placeholder="Enter symbol (e.g., BINANCE:BTCUSDT)" value="BINANCE:BTCUSDT">
+            <button onclick="changeSymbol()">Change Symbol</button>
+            <select id="intervalSelect" onchange="changeInterval()">
+                <option value="1">1 minute</option>
+                <option value="5">5 minutes</option>
+                <option value="15">15 minutes</option>
+                <option value="30">30 minutes</option>
+                <option value="60" selected>1 hour</option>
+                <option value="240">4 hours</option>
+                <option value="1D">1 day</option>
+                <option value="1W">1 week</option>
+            </select>
+            <button onclick="toggleDebug()">Toggle Debug</button>
+        </div>
+        <div class="status" id="status">Connecting...</div>
+    </div>
+    
+    <div id="tv_chart_container"></div>
+    <div class="error-message" id="errorMessage"></div>
+
+    <!-- Include TradingView Advanced Charts library -->
+    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+    <!-- Note: In production, you would use the actual TradingView Advanced Charts library -->
+    <!-- <script src="https://tvjs-staging-static.tradingview.com/bundles/standalone.js"></script> -->
+
+    <!-- Include the TradingView-API browser build -->
+    <script src="../dist/tradingview-api.browser.js"></script>
+
+    <script>
+        let widget = null;
+        let datafeed = null;
+        let debugMode = false;
+
+        // Initialize the datafeed
+        function initDatafeed() {
+            datafeed = new TradingView.Datafeed({
+                debug: debugMode,
+                // Add your credentials here if needed for premium features
+                // token: 'your_sessionid',
+                // signature: 'your_signature'
+            });
+
+            // Update connection status
+            const statusEl = document.getElementById('status');
+            const updateStatus = () => {
+                if (datafeed.isConnected) {
+                    statusEl.textContent = 'Connected';
+                    statusEl.className = 'status connected';
+                } else {
+                    statusEl.textContent = 'Disconnected';
+                    statusEl.className = 'status disconnected';
+                }
+            };
+
+            // Monitor connection status
+            setInterval(updateStatus, 1000);
+        }
+
+        // Initialize the chart widget
+        function initWidget() {
+            // For this example, we'll create a simple chart visualization
+            // In production, you would use TradingView's Advanced Charts widget
+            
+            const container = document.getElementById('tv_chart_container');
+            container.innerHTML = '<div style="padding: 20px; text-align: center;">' +
+                '<h2>TradingView Advanced Charts Widget</h2>' +
+                '<p>In a production environment, the TradingView Advanced Charts widget would be initialized here with:</p>' +
+                '<pre style="background: #2a2e39; padding: 20px; border-radius: 8px; text-align: left; display: inline-block;">' +
+`widget = new TradingView.widget({
+    container_id: "tv_chart_container",
+    datafeed: datafeed,
+    library_path: "/charting_library/",
+    locale: "en",
+    disabled_features: ["use_localstorage_for_settings"],
+    enabled_features: ["study_templates"],
+    charts_storage_url: "https://saveload.tradingview.com",
+    charts_storage_api_version: "1.1",
+    client_id: "tradingview.com",
+    user_id: "public_user_id",
+    fullscreen: false,
+    autosize: true,
+    symbol: "BINANCE:BTCUSDT",
+    interval: "60",
+    theme: "dark",
+    style: "1",
+    toolbar_bg: "#131722",
+    enable_publishing: false,
+    allow_symbol_change: true,
+    details: true,
+    hotlist: true,
+    calendar: true
+});` +
+                '</pre>' +
+                '<div style="margin-top: 20px; padding: 20px; background: #2a2e39; border-radius: 8px;">' +
+                '<h3>Datafeed Methods Demo</h3>' +
+                '<button onclick="testDatafeed()">Test Datafeed Methods</button>' +
+                '<div id="testOutput" style="margin-top: 10px; text-align: left; font-family: monospace; font-size: 12px;"></div>' +
+                '</div>' +
+                '</div>';
+        }
+
+        // Test datafeed methods
+        async function testDatafeed() {
+            const output = document.getElementById('testOutput');
+            output.innerHTML = '<p>Testing datafeed methods...</p>';
+
+            try {
+                // Test onReady
+                output.innerHTML += '<p><strong>1. Testing onReady():</strong></p>';
+                datafeed.onReady((config) => {
+                    output.innerHTML += '<pre>' + JSON.stringify(config, null, 2) + '</pre>';
+                });
+
+                // Test searchSymbols
+                output.innerHTML += '<p><strong>2. Testing searchSymbols("BTC", "", "crypto"):</strong></p>';
+                await new Promise((resolve) => {
+                    datafeed.searchSymbols("BTC", "", "crypto", (results) => {
+                        output.innerHTML += '<pre>' + JSON.stringify(results.slice(0, 5), null, 2) + '</pre>';
+                        resolve();
+                    });
+                });
+
+                // Test resolveSymbol
+                output.innerHTML += '<p><strong>3. Testing resolveSymbol("BINANCE:BTCUSDT"):</strong></p>';
+                await new Promise((resolve, reject) => {
+                    datafeed.resolveSymbol("BINANCE:BTCUSDT", 
+                        (symbolInfo) => {
+                            output.innerHTML += '<pre>' + JSON.stringify(symbolInfo, null, 2) + '</pre>';
+                            resolve(symbolInfo);
+                        },
+                        (error) => {
+                            output.innerHTML += '<p style="color: #ef5350;">Error: ' + error + '</p>';
+                            reject(error);
+                        }
+                    );
+                }).then(async (symbolInfo) => {
+                    // Test getBars
+                    output.innerHTML += '<p><strong>4. Testing getBars() for last 10 bars:</strong></p>';
+                    const to = Math.floor(Date.now() / 1000);
+                    const from = to - (10 * 60 * 60); // 10 hours ago for hourly bars
+
+                    await new Promise((resolve, reject) => {
+                        datafeed.getBars(
+                            symbolInfo,
+                            "60",
+                            { from, to, countBack: 10, firstDataRequest: true },
+                            (bars, meta) => {
+                                output.innerHTML += '<pre>Received ' + bars.length + ' bars\n';
+                                if (bars.length > 0) {
+                                    output.innerHTML += 'First bar: ' + JSON.stringify(bars[0], null, 2) + '\n';
+                                    output.innerHTML += 'Last bar: ' + JSON.stringify(bars[bars.length - 1], null, 2) + '</pre>';
+                                }
+                                resolve();
+                            },
+                            (error) => {
+                                output.innerHTML += '<p style="color: #ef5350;">Error: ' + error + '</p>';
+                                reject(error);
+                            }
+                        );
+                    });
+
+                    // Test subscribeBars
+                    output.innerHTML += '<p><strong>5. Testing subscribeBars() real-time updates:</strong></p>';
+                    output.innerHTML += '<div id="realtimeUpdates" style="background: #131722; padding: 10px; border-radius: 4px; max-height: 200px; overflow-y: auto;"></div>';
+                    
+                    const realtimeDiv = document.getElementById('realtimeUpdates');
+                    let updateCount = 0;
+                    
+                    datafeed.subscribeBars(
+                        symbolInfo,
+                        "1", // 1 minute for more frequent updates
+                        (bar) => {
+                            updateCount++;
+                            const timestamp = new Date(bar.time).toLocaleTimeString();
+                            realtimeDiv.innerHTML = `<p>Update #${updateCount} at ${timestamp}:</p>` +
+                                `<pre>${JSON.stringify(bar, null, 2)}</pre>` +
+                                realtimeDiv.innerHTML;
+                            
+                            // Keep only last 5 updates
+                            const updates = realtimeDiv.querySelectorAll('p');
+                            if (updates.length > 5) {
+                                for (let i = 5; i < updates.length; i++) {
+                                    updates[i].nextElementSibling.remove();
+                                    updates[i].remove();
+                                }
+                            }
+                        },
+                        "test_subscription_1",
+                        () => {
+                            console.log("Reset cache needed");
+                        }
+                    );
+
+                    // Test quotes
+                    output.innerHTML += '<p><strong>6. Testing getQuotes() for multiple symbols:</strong></p>';
+                    await new Promise((resolve) => {
+                        datafeed.getQuotes(
+                            ["BINANCE:BTCUSDT", "BINANCE:ETHUSDT"],
+                            (quotes) => {
+                                output.innerHTML += '<pre>' + JSON.stringify(quotes, null, 2) + '</pre>';
+                                resolve();
+                            },
+                            (error) => {
+                                output.innerHTML += '<p style="color: #ef5350;">Error: ' + error + '</p>';
+                                resolve();
+                            }
+                        );
+                    });
+
+                    // Clean up subscription after 30 seconds
+                    setTimeout(() => {
+                        datafeed.unsubscribeBars("test_subscription_1");
+                        realtimeDiv.innerHTML += '<p style="color: #ffa726;">Subscription stopped after 30 seconds</p>';
+                    }, 30000);
+                });
+
+            } catch (error) {
+                output.innerHTML += '<p style="color: #ef5350;">Test error: ' + error.message + '</p>';
+            }
+        }
+
+        // Change symbol
+        function changeSymbol() {
+            const symbol = document.getElementById('symbolInput').value;
+            if (widget && widget.chart) {
+                widget.chart().setSymbol(symbol, () => {
+                    console.log('Symbol changed to:', symbol);
+                });
+            } else {
+                showError('Widget not initialized. In production, this would change the chart symbol.');
+            }
+        }
+
+        // Change interval
+        function changeInterval() {
+            const interval = document.getElementById('intervalSelect').value;
+            if (widget && widget.chart) {
+                widget.chart().setResolution(interval, () => {
+                    console.log('Interval changed to:', interval);
+                });
+            } else {
+                showError('Widget not initialized. In production, this would change the chart interval.');
+            }
+        }
+
+        // Toggle debug mode
+        function toggleDebug() {
+            debugMode = !debugMode;
+            console.log('Debug mode:', debugMode ? 'ON' : 'OFF');
+            showError('Debug mode ' + (debugMode ? 'enabled' : 'disabled') + '. Restart to apply changes.');
+        }
+
+        // Show error message
+        function showError(message) {
+            const errorEl = document.getElementById('errorMessage');
+            errorEl.textContent = message;
+            errorEl.style.display = 'block';
+            setTimeout(() => {
+                errorEl.style.display = 'none';
+            }, 5000);
+        }
+
+        // Initialize on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            initDatafeed();
+            initWidget();
+        });
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (datafeed) {
+                datafeed.destroy();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,3 +1,5 @@
+const { getDebugFlag } = require('../environment');
+
 /**
  * @typedef {'loaded' | 'data' | 'error'} MarketEvent
  */
@@ -61,7 +63,7 @@ module.exports = (quoteSession) => class QuoteMarket {
     this.#symbolListenerID = this.#symbolListeners[this.#symbolKey].length;
 
     this.#symbolListeners[this.#symbolKey][this.#symbolListenerID] = (packet) => {
-      if (global.TW_DEBUG) console.log('§90§30§105 MARKET §0 DATA', packet);
+      if (getDebugFlag()) console.log('§90§30§105 MARKET §0 DATA', packet);
 
       if (packet.type === 'qsd' && packet.data[1].s === 'ok') {
         this.#lastData = {

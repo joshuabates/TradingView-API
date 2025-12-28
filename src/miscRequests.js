@@ -1,8 +1,8 @@
-const os = require('os');
-const axios = require('axios');
+const axios = require('./http-wrapper');
 
 const PineIndicator = require('./classes/PineIndicator');
 const { genAuthCookies } = require('./utils');
+const { generateUserAgent } = require('./environment');
 
 const validateStatus = (status) => status < 500;
 
@@ -129,26 +129,33 @@ module.exports = {
    * Find a symbol
    * @function searchMarketV3
    * @param {string} search Keywords
-   * @param {'stock'
+   * @param {'stocks'
    *  | 'futures' | 'forex' | 'cfd'
    *  | 'crypto' | 'index' | 'economic'
    * } [filter] Caterogy filter
    * @returns {Promise<SearchMarketResult[]>} Search results
    */
   async searchMarketV3(search, filter = '') {
-    const splittedSearch = search.toUpperCase().replace(/ /g, '+').split(':');
+    const splitSearch = search.toUpperCase().replace(/ /g, '+').split(':');
+    const params = {
+      text: splitSearch[splitSearch.length - 1],
+      search_type: filter,
+      sort_by_country: 'US',
+      promo: true,
+      domain: 'production',
+      lang: 'en',
+      country: 'US',
+      // hl: 1,
+    };
+
+    if (splitSearch.length === 2) {
+      params.exchange = splitSearch[0];
+    }
 
     const request = await axios.get(
       'https://symbol-search.tradingview.com/symbol_search/v3',
       {
-        params: {
-          exchange: (splittedSearch.length === 2
-            ? splittedSearch[0]
-            : undefined
-          ),
-          text: splittedSearch.pop(),
-          search_type: filter,
-        },
+        params,
         headers: {
           origin: 'https://www.tradingview.com',
         },
@@ -163,12 +170,10 @@ module.exports = {
       const id = s.prefix ? `${s.prefix}:${s.symbol}` : `${exchange.toUpperCase()}:${s.symbol}`;
 
       return {
+        ...s,
         id,
         exchange,
         fullExchange: s.exchange,
-        symbol: s.symbol,
-        description: s.description,
-        type: s.type,
         getTA: () => this.getTA(id),
       };
     });
@@ -385,7 +390,7 @@ module.exports = {
         headers: {
           referer: 'https://www.tradingview.com',
           'Content-Type': 'application/x-www-form-urlencoded',
-          'User-agent': `${UA} (${os.version()}; ${os.platform()}; ${os.arch()})`,
+          'User-agent': generateUserAgent(UA),
         },
         validateStatus,
       },

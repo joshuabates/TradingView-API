@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TradingView API Browser Test</title>
+</head>
+<body>
+    <h1>TradingView API Browser Test</h1>
+    <div id="output"></div>
+
+    <!-- Include the built TradingView API -->
+    <script src="../dist/tradingview-api.browser.js"></script>
+    
+    <script>
+        console.log('Testing TradingView API...');
+        
+        const output = document.getElementById('output');
+        
+        // Test 1: Check if TradingViewAPI is loaded
+        if (typeof TradingViewAPI !== 'undefined') {
+            output.innerHTML += '<p style="color: green;">✓ TradingViewAPI global object loaded</p>';
+            console.log('TradingViewAPI object:', TradingViewAPI);
+            
+            // Test 2: Check available exports
+            const exports = Object.keys(TradingViewAPI);
+            output.innerHTML += `<p>Available exports: ${exports.join(', ')}</p>`;
+            
+            // Test 3: Check if Client exists
+            if (TradingViewAPI.Client) {
+                output.innerHTML += '<p style="color: green;">✓ TradingViewAPI.Client exists</p>';
+                
+                // Test 4: Try to create a client
+                try {
+                    const client = new TradingViewAPI.Client();
+                    output.innerHTML += '<p style="color: green;">✓ Client created successfully</p>';
+                    
+                    // Log client methods
+                    const clientMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(client))
+                        .filter(name => typeof client[name] === 'function');
+                    output.innerHTML += `<p>Client methods: ${clientMethods.join(', ')}</p>`;
+                    
+                    // Clean up
+                    client.end();
+                } catch (err) {
+                    output.innerHTML += `<p style="color: red;">✗ Error creating client: ${err.message}</p>`;
+                    console.error(err);
+                }
+            } else {
+                output.innerHTML += '<p style="color: red;">✗ TradingViewAPI.Client not found</p>';
+            }
+        } else {
+            output.innerHTML += '<p style="color: red;">✗ TradingViewAPI not loaded. Run "npm run build" first!</p>';
+        }
+    </script>
+</body>
+</html>

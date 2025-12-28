@@ -61,6 +61,68 @@ Last version:
 npm i github:Mathieu2301/TradingView-API
 ```
 
+## Browser Support
+
+This library now supports browser environments! See the [Browser Usage Guide](./docs/BROWSER_USAGE.md) for detailed instructions.
+
+Quick start:
+```bash
+npm install
+npm run build:browser
+```
+
+Then include `dist/tradingview-api.browser.js` in your web page.
+
+## TradingView Advanced Charts Datafeed
+
+This library now includes a complete Datafeed implementation for use with TradingView Advanced Charts.
+
+### Quick Start
+
+```javascript
+const TradingView = require('@mathieuc/tradingview');
+
+// Create datafeed
+const datafeed = new TradingView.Datafeed({
+  debug: true,
+  // Optional: Add credentials for premium features
+  // token: 'your_sessionid',
+  // signature: 'your_signature'
+});
+
+// Use with TradingView Advanced Charts
+const widget = new TradingView.widget({
+  datafeed: datafeed,
+  container_id: "tv_chart_container",
+  symbol: "BINANCE:BTCUSDT",
+  interval: "60",
+  // ... other widget options
+});
+```
+
+### Browser Usage
+
+```html
+<script src="dist/tradingview-api.browser.js"></script>
+<script>
+  const datafeed = new TradingView.Datafeed();
+  // Use with TradingView Advanced Charts widget
+</script>
+```
+
+See `examples/datafeed-example.html` for a complete browser example.
+
+### Datafeed Features
+
+- ✅ Real-time bar/candle updates
+- ✅ Historical data
+- ✅ Symbol search and resolution  
+- ✅ Multiple symbol quotes
+- ✅ All chart resolutions (1m to 1M)
+- ✅ Automatic reconnection
+- ✅ Error handling
+- ✅ Browser & Node.js support
+
 ## Examples
 
 You can find all the examples and snippets in `./examples` folder.
