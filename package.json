@@ -25,6 +25,7 @@
     "example:dev": "nodemon --env-file=.env",
     "build": "npm run build:browser",
     "build:browser": "webpack --config webpack.config.js",
+    "prepare": "npm run build",
     "prepublishOnly": "npm run build"
   },
   "repository": {
